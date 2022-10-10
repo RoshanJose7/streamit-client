@@ -2,12 +2,11 @@
   "compilerOptions": {
     "jsx": "react",
     "baseUrl": ".",
-    "outDir": "build",
     "paths": {
-      "@components/*": ["src/components/*"],
       "@pages/*": ["src/pages/*"],
+      "@utils/*": ["src/utils/*"],
       "@assets/*": ["src/assets/*"],
-      "@utils/*": ["src/utils/*"]
+      "@components/*": ["src/components/*"]
     }
   }
 }

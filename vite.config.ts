@@ -6,10 +6,10 @@ import reactRefresh from "@vitejs/plugin-react-refresh";
 const tsconfig = {
   compilerOptions: {
     paths: {
-      "@components/*": ["src/components/*"],
       "@pages/*": ["src/pages/*"],
-      "@assets/*": ["src/assets/*"],
       "@utils/*": ["src/utils/*"],
+      "@assets/*": ["src/assets/*"],
+      "@components/*": ["src/components/*"],
     },
   },
 };
