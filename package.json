@@ -4,8 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "react-scripts start",
-    "prestart": "yarn build && yarn global add serve",
-    "start": "serve -s build -l tcp://localhost:8080",
+    "start": "PORT=8080 react-scripts start",
     "build": "react-scripts build"
   },
   "dependencies": {
