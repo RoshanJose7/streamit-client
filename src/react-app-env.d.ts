@@ -1,4 +1,7 @@
-/// <reference types="react-scripts" />
+/// <reference types="vite/client" />
+/// <reference types="vite-plugin-svgr/client" />
+
+import { FileTransmitType, UploadStatus } from "@utils/constants";
 
 interface UploadedFile {
   id: string;

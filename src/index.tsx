@@ -1,7 +1,8 @@
-import React from "react";
-import ReactDOM from "react-dom";
-import Router from "./Routers";
+import * as React from "react";
+import * as ReactDOM from "react-dom";
+
 import "./global.css";
+import Router from "./Routers";
 
 ReactDOM.render(
   <React.StrictMode>

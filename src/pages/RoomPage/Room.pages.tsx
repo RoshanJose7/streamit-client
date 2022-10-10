@@ -1,19 +1,20 @@
 import axios from "axios";
-import download from "downloadjs";
-import SHA256 from "crypto-js/sha256";
+import * as React from "react";
+import { SHA256 } from "crypto-js";
 import { v4 as uuid, v4 } from "uuid";
 import { useNavigate, useParams } from "react-router-dom";
 import { useContext, useEffect, useRef, useState } from "react";
 
 import "./Room.styles.scss";
-import { formatBytes } from "../../utils/Files";
-import { SocketContext } from "../../utils/Socket";
-import { ReactComponent as ExitSVG } from "../../assets/exit.svg";
-import { ReactComponent as SendSVG } from "../../assets/send.svg";
-import { ReactComponent as SentSVG } from "../../assets/sent.svg";
-import { ReactComponent as BrowseSVG } from "../../assets/browse.svg";
-import { FileTransmitType, HOST, UploadStatus } from "../../utils/constants";
-import { ReactComponent as DownloadSVG } from "../../assets/download.svg";
+import { formatBytes } from "@utils/Files";
+import { SocketContext } from "@utils/Socket";
+import { ReactComponent as ExitSVG } from "@assets/exit.svg";
+import { ReactComponent as SendSVG } from "@assets/send.svg";
+import { ReactComponent as SentSVG } from "@assets/sent.svg";
+import { TransferData, UploadedFile } from "src/react-app-env";
+import { ReactComponent as BrowseSVG } from "@assets/browse.svg";
+import { ReactComponent as DownloadSVG } from "@assets/download.svg";
+import { FileTransmitType, HOST, UploadStatus } from "@utils/constants";
 
 function RoomPage() {
   const { roomName, userName } = useParams();
@@ -264,13 +265,12 @@ function RoomPage() {
                     <p>{formatBytes(his.size)}</p>
                   </div>
 
-                  <button
-                    onClick={() => {
-                      download(`${HOST}/files/${roomName}/${his.id}`, his.name);
-                    }}
+                  <a
+                    download={his.name}
+                    href={`${HOST}/files/${roomName}/${his.id}`}
                   >
                     <DownloadSVG />
-                  </button>
+                  </a>
                 </div>
               </div>
             )

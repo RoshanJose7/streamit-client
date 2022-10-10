@@ -1,5 +1,7 @@
+import * as React from "react";
 import { useRef } from "react";
 import { useNavigate } from "react-router-dom";
+
 import "./Home.styles.scss";
 
 function HomePage() {

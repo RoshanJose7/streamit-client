@@ -1,9 +1,11 @@
+import * as React from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
-import NavbarComponent from "./components/Navbar/Navbar.components";
-import FooterComponent from "./components/Footer/Footer.components";
-import RoomRouter from "./pages/HomePage/Home.pages";
-import RoomPage from "./pages/RoomPage/Room.pages";
-import { SocketContext, socket } from "./utils/Socket";
+
+import RoomPage from "@pages/RoomPage/Room.pages";
+import RoomRouter from "@pages/HomePage/Home.pages";
+import { SocketContext, socket } from "@utils/Socket";
+import NavbarComponent from "@components/Navbar/Navbar.components";
+import FooterComponent from "@components/Footer/Footer.components";
 
 function Routers() {
   return (
