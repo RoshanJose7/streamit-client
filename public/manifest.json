@@ -18,6 +18,8 @@
       "sizes": "512x512"
     }
   ],
+  "permissions": ["unlimitedStorage"],
+  "optional_permissions": ["unlimitedStorage"],
   "start_url": ".",
   "display": "standalone",
   "theme_color": "#000000",

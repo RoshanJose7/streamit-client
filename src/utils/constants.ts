@@ -1,5 +1,4 @@
-console.log(process.env.NODE_ENV, "NODE_ENV");
-
+export const CHUNK_SIZE = 1e6;
 export const HOST =
   process.env.NODE_ENV !== "development"
     ? "https://sendr-api.azurewebsites.net/"
@@ -15,3 +14,18 @@ export enum FileTransmitType {
   SENT = 1,
   RECEIVED = 2,
 }
+
+// export const DBConfig: IndexedDBProps = {
+//   name: "MyDB",
+//   version: 1,
+//   objectStoresMeta: [
+//     {
+//       store: "files",
+//       storeConfig: { keyPath: "id", autoIncrement: true },
+//       storeSchema: [
+//         { name: "counter", keypath: "counter", options: { unique: false } },
+//         { name: "data", keypath: "data", options: { unique: false } },
+//       ],
+//     },
+//   ],
+// };

@@ -7,6 +7,7 @@ interface UploadedFile {
   id: string;
   name: string;
   size: number;
+  url?: string;
   sender: string;
   status: UploadStatus;
   type: FileTransmitType;

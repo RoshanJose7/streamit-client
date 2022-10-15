@@ -1,10 +1,10 @@
-import axios from "axios";
 import * as React from "react";
 import { SHA256 } from "crypto-js";
 import { v4 as uuid, v4 } from "uuid";
 import { useNavigate, useParams } from "react-router-dom";
 import { useContext, useEffect, useRef, useState } from "react";
 
+import db from "@utils/db";
 import "./Room.styles.scss";
 import { formatBytes } from "@utils/Files";
 import { SocketContext } from "@utils/Socket";
@@ -14,44 +14,39 @@ import { ReactComponent as SentSVG } from "@assets/sent.svg";
 import { TransferData, UploadedFile } from "src/react-app-env";
 import { ReactComponent as BrowseSVG } from "@assets/browse.svg";
 import { ReactComponent as DownloadSVG } from "@assets/download.svg";
-import { FileTransmitType, HOST, UploadStatus } from "@utils/constants";
+import { CHUNK_SIZE, UploadStatus, FileTransmitType } from "@utils/constants";
 
 function RoomPage() {
+  const navigate = useNavigate();
   const { roomName, userName } = useParams();
   const socket = useContext(SocketContext);
-  const navigate = useNavigate();
-
   const [sendProgress, setSendProgress] = useState(0);
-  const [history, setHistory] = useState<(UploadedFile | string)[]>([]);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [history, setHistory] = useState<(UploadedFile | string)[]>([]);
 
   const fileRef = useRef<HTMLInputElement | null>(null);
   const btnRef = useRef<HTMLButtonElement | null>(null);
 
-  useEffect(() => {
-    if (socket === null) {
-      navigate("/");
-      return;
-    }
-
-    socket.emit("join_room", {
-      room: roomName,
-      name: userName,
-    });
-
+  async function setupSocketListeners() {
     socket.off("disconnect").on("disconnect", () => {
       socket.removeAllListeners();
       socket.removeAllListeners("disconnect");
     });
 
-    socket.off("notification").on("notification", (payload) => {
+    socket.off("file_part_recv").on("file_part_recv", async (data) => {
+      console.log("file_part_recv_data", data);
+      await db.files.add({ data: data["chunk"], counter: data["counter"] });
+    });
+
+    socket.off("notification").on("notification", async (payload) => {
       if (payload["type"] === "log")
         setHistory((prevNotifications) => [
           ...prevNotifications,
           payload["notification"],
         ]);
-      else if (payload["type"] === "new_file") {
+      else if (payload["type"] === "new_file_received") {
         const data = payload["data"];
+        console.log(data, "new_file_received_data");
         if (data.sender === userName) return;
 
         const file: UploadedFile = {
@@ -66,11 +61,63 @@ function RoomPage() {
               : FileTransmitType.RECEIVED,
         };
 
-        console.log(file, "receivedfile");
+        const fileparts = [];
+        const chunkCount =
+          file.size % CHUNK_SIZE === 0
+            ? file.size / CHUNK_SIZE
+            : Math.floor(file.size / CHUNK_SIZE) + 1;
+
+        for (let i = 0; i < chunkCount; i++) {
+          const filepart = await db.files.where("counter").equals(i).first();
+          fileparts.push(filepart["data"]);
+        }
+
+        const receivedFile = new File(fileparts, file.name);
+        const downloadUrl = URL.createObjectURL(receivedFile);
+
+        console.log(downloadUrl, "downloadUrl");
+
+        setHistory((prev) => {
+          const idx = prev.findIndex(
+            (f) => typeof f !== "string" && f.id === data.fileid
+          );
+
+          const oldFile = prev[idx] as UploadedFile;
+          if (!oldFile) return prev;
+
+          prev.splice(idx, 1);
+
+          const newFiles = prev;
+
+          oldFile.url = downloadUrl;
+          oldFile.status = UploadStatus.UPLOADED;
+          newFiles.push(oldFile);
+
+          return newFiles;
+        });
+
+        await db.files.clear();
+      } else if (payload["type"] === "new_file") {
+        await db.files.clear();
+        const data = payload["data"];
+        if (data.sender === userName) return;
+
+        const file: UploadedFile = {
+          id: data.fileid,
+          name: data.name,
+          size: data.size,
+          status: UploadStatus.PENDING,
+          sender: data.sender,
+          type:
+            data.sender === userName
+              ? FileTransmitType.SENT
+              : FileTransmitType.RECEIVED,
+        };
 
         setHistory((prevNotifications) => [...prevNotifications, file]);
       } else if (payload["type"] === "percentage_update") {
         const data = payload["data"];
+        console.log(data, "percentage_update_data");
         setSendProgress(data.percentage);
 
         if (data.percentage === 100) {
@@ -93,6 +140,20 @@ function RoomPage() {
         }
       }
     });
+  }
+
+  useEffect(() => {
+    if (socket === null) {
+      navigate("/");
+      return;
+    }
+
+    socket.emit("join_room", {
+      room: roomName,
+      name: userName,
+    });
+
+    setupSocketListeners();
 
     return () => {
       socket.emit("leave_room", {
@@ -107,83 +168,91 @@ function RoomPage() {
     if (files.length > 0) setSelectedFiles(files);
   }
 
-  async function handleFile(file: File, fileid: string) {
-    if (!file) return;
+  async function uploadChunk(
+    transferid: string,
+    file: File,
+    i: number,
+    chunkCount: number
+  ): Promise<{ message?: string; error?: string }> {
+    const BEGINNING_OF_CHUNK = CHUNK_SIZE * i;
+    const ENDING_OF_CHUNK = BEGINNING_OF_CHUNK + CHUNK_SIZE;
 
+    const chunk = file.slice(BEGINNING_OF_CHUNK, ENDING_OF_CHUNK);
+    const chunktext = await chunk.text();
+    const checksum = SHA256(chunktext).toString();
+    const progressPercentage = Math.round((i / chunkCount) * 100);
+
+    return new Promise((resolve, reject) => {
+      socket.emit("file_part", {
+        transferid,
+        chunk,
+        checksum,
+        counter: i,
+        percentage: progressPercentage,
+      });
+
+      socket
+        .off("ack_file_part")
+        .on("ack_file_part", async ({ id, counter, chunkRecieved }) => {
+          if (!chunkRecieved) {
+            console.log("Chunk failed at " + counter);
+            reject({ error: "Failed!" });
+          } else resolve({ message: "Success!" });
+        });
+    });
+  }
+
+  function handleFile(file: File, fileid: string) {
     const transferid = v4();
-    const CHUNK_SIZE = 1e6;
     const chunkCount =
       file.size % CHUNK_SIZE === 0
         ? file.size / CHUNK_SIZE
         : Math.floor(file.size / CHUNK_SIZE) + 1;
 
-    const data: TransferData = {
-      fileid,
-      transferid,
-      sender: userName!,
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      room: roomName!,
-    };
+    return new Promise((resolve, reject) => {
+      if (socket) {
+        const data: TransferData = {
+          fileid,
+          transferid,
+          sender: userName!,
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          room: roomName!,
+        };
 
-    setSendProgress(0);
-    setSelectedFiles([]);
+        socket.emit("file_create", data);
 
-    const createfileresponse = await axios.post(`${HOST}/files/create`, data, {
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Content-Type": "application/json",
-      },
-    });
+        socket
+          .off("ack_file_create")
+          .on("ack_file_create", async (transferid) => {
+            let i = 0;
 
-    let i = 0;
-    while (i < chunkCount) {
-      const BEGINNING_OF_CHUNK = CHUNK_SIZE * i;
-      const ENDING_OF_CHUNK = BEGINNING_OF_CHUNK + CHUNK_SIZE;
+            while (i < chunkCount) {
+              const { message, error } = await uploadChunk(
+                transferid,
+                file,
+                i,
+                chunkCount
+              );
 
-      const chunk = file.slice(BEGINNING_OF_CHUNK, ENDING_OF_CHUNK);
-      const chunktext = await chunk.text();
-      const checksum = SHA256(chunktext).toString();
-      const percentage = Math.round((i / chunkCount) * 100);
+              if (error) continue;
+              else {
+                console.log(message, "message");
+                i++;
+              }
+            }
 
-      const data = new FormData();
-      data.append("chunk", chunk);
-      data.append("checksum", checksum);
-      data.append("counter", i.toString());
-      data.append("transferid", transferid);
-      data.append("percentage", percentage.toString());
+            socket!.emit("file_complete", data);
+            resolve("File Sent!");
+          });
 
-      await axios.post(`${HOST}/files/part`, data, {
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Content-Type": "multipart/form-data",
-        },
-      });
-
-      i++;
-    }
-
-    const filesendcompleteresponse = await axios.post(
-      `${HOST}/files/complete`,
-      {
-        transferid,
-      },
-      {
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Content-Type": "application/json",
-        },
+        // Recieving End
+        socket.off("error").on("error", (err) => {
+          console.error(err);
+          reject(err);
+        });
       }
-    );
-
-    socket!.emit("notification", {
-      type: "new_file",
-      payload: {
-        fileid: fileid,
-        room: roomName,
-        sender: socket!.id,
-      },
     });
   }
 
@@ -207,6 +276,18 @@ function RoomPage() {
     }
   }
 
+  function download(file: UploadedFile) {
+    const link = document.createElement("a");
+
+    link.href = file.url;
+    link.setAttribute("download", file.name);
+
+    document.body.appendChild(link);
+
+    link.click();
+    link.parentNode.removeChild(link);
+  }
+
   return (
     <main id="room-page">
       <div id="room-page-header">
@@ -219,8 +300,10 @@ function RoomPage() {
 
       <div id="room-page-content">
         {history.length !== 0 ? (
-          history.map((his, idx) =>
-            typeof his === "string" ? (
+          history.map((his, idx) => {
+            console.log(his);
+
+            return typeof his === "string" ? (
               <h4 key={idx} className="notification">
                 {his}
               </h4>
@@ -265,16 +348,18 @@ function RoomPage() {
                     <p>{formatBytes(his.size)}</p>
                   </div>
 
-                  <a
-                    download={his.name}
-                    href={`${HOST}/files/${roomName}/${his.id}`}
-                  >
-                    <DownloadSVG />
-                  </a>
+                  {his.status === UploadStatus.UPLOADED ? (
+                    <DownloadSVG
+                      style={{ cursor: "pointer" }}
+                      onClick={() => download(his)}
+                    />
+                  ) : (
+                    <h5>{sendProgress}%</h5>
+                  )}
                 </div>
               </div>
-            )
-          )
+            );
+          })
         ) : (
           <div className="center">
             <h5>No Files Yet!</h5>
