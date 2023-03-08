@@ -35,6 +35,7 @@ function RoomPage() {
 
     socket.off("file_part_recv").on("file_part_recv", async (data) => {
       console.log("file_part_recv_data", data);
+      data
       await db.files.add({ data: data["chunk"], counter: data["counter"] });
     });
 
@@ -117,7 +118,9 @@ function RoomPage() {
         setHistory((prevNotifications) => [...prevNotifications, file]);
       } else if (payload["type"] === "percentage_update") {
         const data = payload["data"];
-        console.log(data, "percentage_update_data");
+
+        console.log(`${data.percentage} ${Date.now()}`);
+
         setSendProgress(data.percentage);
 
         if (data.percentage === 100) {
