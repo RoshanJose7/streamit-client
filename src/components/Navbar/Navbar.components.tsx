@@ -7,7 +7,7 @@ function NavbarComponent() {
   return (
     <nav>
       <Link to="/">
-        <h1>Sendr</h1>
+        <h1>StreamIt</h1>
       </Link>
     </nav>
   );

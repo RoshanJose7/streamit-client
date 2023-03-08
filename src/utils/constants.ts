@@ -1,8 +1,5 @@
 export const CHUNK_SIZE = 1e5;
-export const HOST =
-  process.env.NODE_ENV !== "development"
-    ? "https://sendr-api.azurewebsites.net/"
-    : "http://localhost:8080";
+export const HOST = "https://sendr-api.azurewebsites.net/";
 
 export enum UploadStatus {
   PENDING = 1,

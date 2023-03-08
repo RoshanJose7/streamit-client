@@ -193,8 +193,10 @@ function RoomPage() {
 
       socket
         .off("ack_file_part")
-        .on("ack_file_part", async ({ id, counter, chunkRecieved }) => {
-          if (!chunkRecieved) {
+        .on("ack_file_part", async ({ id, counter, chunkReceived }) => {
+          console.log(chunkReceived);
+
+          if (!chunkReceived) {
             console.log("Chunk failed at " + counter);
             reject({ error: "Failed!" });
           } else resolve({ message: "Success!" });
@@ -226,6 +228,8 @@ function RoomPage() {
         socket
           .off("ack_file_create")
           .on("ack_file_create", async (transferid) => {
+            console.log("ack_file_create");
+
             let i = 0;
 
             while (i < chunkCount) {
@@ -247,7 +251,7 @@ function RoomPage() {
             resolve("File Sent!");
           });
 
-        // Recieving End
+        // Receiving End
         socket.off("error").on("error", (err) => {
           console.error(err);
           reject(err);
@@ -280,6 +284,7 @@ function RoomPage() {
     const link = document.createElement("a");
 
     link.href = file.url;
+    console.log(file.url);
     link.setAttribute("download", file.name);
 
     document.body.appendChild(link);

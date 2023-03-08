@@ -4,8 +4,8 @@ import "./Footer.styles.scss";
 function FooterComponent() {
   return (
     <footer>
-      <h3>Made by Jose7</h3>
-      <p>Sendr &copy; 2022</p>
+      <h3>Made by The Network Preachers</h3>
+      <p>StreamIt &copy; 2023</p>
     </footer>
   );
 }
