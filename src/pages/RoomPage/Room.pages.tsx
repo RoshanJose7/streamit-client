@@ -35,7 +35,7 @@ function RoomPage() {
 
     socket.off("file_part_recv").on("file_part_recv", async (data) => {
       console.log("file_part_recv_data", data);
-      data
+      data;
       await db.files.add({ data: data["chunk"], counter: data["counter"] });
     });
 
@@ -197,8 +197,6 @@ function RoomPage() {
       socket
         .off("ack_file_part")
         .on("ack_file_part", async ({ id, counter, chunkReceived }) => {
-          console.log(chunkReceived);
-
           if (!chunkReceived) {
             console.log("Chunk failed at " + counter);
             reject({ error: "Failed!" });
@@ -216,7 +214,7 @@ function RoomPage() {
 
     return new Promise((resolve, reject) => {
       if (socket) {
-        const data: TransferData = {
+        const file_create_data: TransferData = {
           fileid,
           transferid,
           sender: userName!,
@@ -226,35 +224,31 @@ function RoomPage() {
           room: roomName!,
         };
 
-        socket.emit("file_create", data);
+        socket.emit("file_create", file_create_data);
 
-        socket
-          .off("ack_file_create")
-          .on("ack_file_create", async (transferid) => {
-            console.log("ack_file_create");
+        socket.off("ack_file_create").on("ack_file_create", async (data) => {
+          let i = 0;
 
-            let i = 0;
+          while (i < chunkCount) {
+            const { message, error } = await uploadChunk(
+              transferid,
+              file,
+              i,
+              chunkCount
+            );
 
-            while (i < chunkCount) {
-              const { message, error } = await uploadChunk(
-                transferid,
-                file,
-                i,
-                chunkCount
-              );
+            console.log(message);
 
-              if (error) continue;
-              else {
-                console.log(message, "message");
-                i++;
-              }
+            if (error) continue;
+            else {
+              i++;
             }
+          }
 
-            socket!.emit("file_complete", data);
-            resolve("File Sent!");
-          });
+          socket!.emit("file_complete", data);
+          resolve("File Sent!");
+        });
 
-        // Receiving End
         socket.off("error").on("error", (err) => {
           console.error(err);
           reject(err);
